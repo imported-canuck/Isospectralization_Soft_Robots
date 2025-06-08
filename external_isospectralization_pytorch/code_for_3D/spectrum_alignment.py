@@ -138,7 +138,7 @@ def calc_evals(VERT, TRIV):
     Lx, S, _, _ = tf_calc_lap(mesh, mesh[0])
     Si = torch.diag(torch.sqrt(1 / S[:, 0]))
     Lap = torch.mm(Si, torch.mm(Lx, Si))
-    evals, _ = torch.symeig(Lap)
+    evals = torch.linalg.eigvalsh(Lap, UPLO='U')
     return evals
 
 
@@ -245,7 +245,7 @@ def forward(
     Lap = torch.mm(Si, torch.mm(Lx, Si))
 
     # Spectral decomposition approach
-    s_, v = torch.symeig(Lap, eigenvectors=True)
+    s_ = torch.linalg.eigvalsh(Lap, UPLO='U')
     graph.cost_evals_f1 = (
         1e2
         * l2_loss(
@@ -270,7 +270,7 @@ def forward(
         )
     )
     graph.decay = (1 - params.decay_target) * cosine_decay + params.decay_target
-    graph.decay = np.float(graph.decay)
+    graph.decay = float(graph.decay)
 
     if params.smoothing == "displacement":
         # Regularizers for displacement-based formulation
@@ -324,7 +324,7 @@ def forward(
 
     else:
         # Compute the eigenvalue sequence of the Laplacian
-        graph.s_, _ = torch.symeig(Lap)
+        graph.s_ = torch.linalg.eigvalsh(Lap, UPLO='U')
 
     return graph
 

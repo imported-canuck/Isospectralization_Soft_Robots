@@ -4,7 +4,7 @@ from spectrum_alignment import *
 #os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 params = OptimizationParams() # Create object of class OptimizationParams to store parameters
-params.evals = [30] # Optimize the first (20) eigenvalues
+params.evals = [20] # Optimize the first (20) eigenvalues
 params.numsteps = 5000 # Number of optimization steps
 params.plot=False # Disables plotting during optimization
 

@@ -2,12 +2,13 @@
 import os
 import sys
 
+## test 
 import numpy as np
 import scipy
 import torch
 from scipy import sparse
 
-from shape_library import load_mesh, prepare_mesh, resample
+from shape_library import load_mesh, prepare_mesh, resample, save_ply, tic, toc
 
 DEFAULT_DEVICE = torch.device("cuda")
 
@@ -133,7 +134,7 @@ def calc_evals(VERT, TRIV):
     Lx, S, _, _ = tf_calc_lap(mesh, mesh[0])
     Si = torch.diag(torch.sqrt(1 / S[:, 0]))
     Lap = torch.mm(Si, torch.mm(Lx, Si))
-    evals, _ = torch.symeig(Lap)
+    evals = torch.linalg.eigvalsh(Lap, UPLO='U')
     return evals
 
 
@@ -228,7 +229,7 @@ def forward(
         )
     )
     decay = (1 - params.decay_target) * cosine_decay + params.decay_target
-    decay = np.float(decay)
+    decay = float(decay)
 
     scaleX = 1  # not used in shape alignment
 
@@ -249,7 +250,7 @@ def forward(
     Lap = torch.mm(Si, torch.mm(Lx, Si))
 
     # Spectral decomposition
-    [evals, v] = torch.symeig(Lap, eigenvectors=True)
+    evals = torch.linalg.eigvalsh(Lap, UPLO='U')
     cost_evals = 1e1 * l2_loss(
         (evals[0:nevals] - target_evals[0:nevals])
         * (

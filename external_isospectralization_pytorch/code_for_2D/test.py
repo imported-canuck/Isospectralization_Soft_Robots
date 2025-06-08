@@ -3,7 +3,7 @@ from shape_library import load_mesh, prepare_mesh, resample
 from spectrum_alignment import OptimizationParams, calc_evals, run_optimization
 
 params = OptimizationParams()
-params.evals = [30]
+params.evals = [20]
 params.min_eval_loss = 0.05
 params.steps = 5000
 params.plot = False
