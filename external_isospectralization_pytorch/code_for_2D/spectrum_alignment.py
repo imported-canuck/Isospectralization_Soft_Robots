@@ -25,13 +25,13 @@ class OptimizationParams:
         self.evals = [20]
 
         # Early stopping
-        self.min_eval_loss = 0.05
+        self.min_eval_loss = 0.05 # minimum eigenvalues loss to stop training
 
         # Adam optimizer
         self.learning_rate = 0.005
 
         # Regularizer coefficients
-        self.decay_target = 0.05
+        self.decay_target = 0.05  # minimum jaggedness penalty weight
         self.bound_reg = 2e1
         self.inner_reg = 1e0
         self.flip_penalty_reg = 1e10
@@ -255,7 +255,7 @@ def forward(
         (evals[0:nevals] - target_evals[0:nevals])
         * (
             1
-            / torch.as_tensor(np.asarray(range(1, nevals + 1), graph.dtype)).to(device)
+            /  torch.as_tensor(np.asarray(range(1, nevals + 1), graph.dtype)).to(device)  # 1/i weighting
         )
     )
 
@@ -272,7 +272,7 @@ def forward(
     flip_cost = params.flip_penalty_reg * l2_loss(cp - torch.abs(cp))
 
     # Inner points regularizer
-    varA = torch.std(Ak, dim=[0])
+    varA = torch.var(Ak, dim=0, correction=0) # match TF’s tf.nn.moments()
     inner_reg_cost = params.inner_reg * (l2_loss(L) + l2_loss(varA))
 
     # Boundary points regularizer
