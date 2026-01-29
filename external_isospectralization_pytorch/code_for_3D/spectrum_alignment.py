@@ -25,17 +25,17 @@ class OptimizationParams:
         self.evals = [10, 20, 30]
 
         # Early stopping
-        self.min_eval_loss = 0.05
+        self.min_eval_loss = 0.05 # 0.05
 
         # Adam optimizer
-        self.learning_rate = 0.005  # 0.00025
+        self.learning_rate = 0.00025  # 0.00025
         self.beta1 = 0.9
         self.beta2 = 0.999
 
         # Smoothing mode
         self.smoothing = smoothing
         if smoothing == "displacement":
-            self.curvature_reg = 2e3
+            self.curvature_reg = 2e3        
             self.smoothness_reg = 2e3
         elif smoothing == "absolute":
             self.curvature_reg = 1e5
@@ -44,9 +44,9 @@ class OptimizationParams:
             raise ValueError(f"Unrecognized smoothing mode (got {smoothing})")
 
         # Regularizer coefficients
-        self.volume_reg = 1e3  # 1e1
-        self.l2_reg = 2e6
-        self.decay_target = 0.05  # 0.01
+        self.volume_reg = 1e1  # 1e1 / 1e3
+        self.l2_reg = 2e6 # 2e6
+        self.decay_target = 0.01  # 0.01
 
 
 def tf_calc_lap(mesh, VERT, device=DEFAULT_DEVICE):

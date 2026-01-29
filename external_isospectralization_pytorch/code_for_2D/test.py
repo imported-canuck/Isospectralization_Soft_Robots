@@ -19,7 +19,7 @@ torch.backends.cudnn.benchmark     = False
 # =======================================================================
 
 params = OptimizationParams()
-params.evals = [30]
+params.evals = [20]
 params.min_eval_loss = 0.05
 # params.decay_target = 0.15
 params.steps = 5000

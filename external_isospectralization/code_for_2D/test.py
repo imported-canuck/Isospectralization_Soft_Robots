@@ -8,7 +8,7 @@ params.evals = [20] # Optimize the first (20) eigenvalues
 params.numsteps = 5000 # Number of optimization steps
 params.plot=False # Disables plotting during optimization
 
-[VERT, TRIV] = load_mesh('data/circle/'); # Loads the initial shape
+[VERT, TRIV] = load_mesh('data/oval/'); # Loads the initial shape
 [VERT,TRIV] = resample(VERT, TRIV, 300) # Resample to 300 vertices
 
 # mesh.vert is a list of vertex coordinates (accesed as VERT)

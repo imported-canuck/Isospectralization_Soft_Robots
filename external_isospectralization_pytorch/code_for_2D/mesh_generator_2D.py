@@ -18,11 +18,78 @@ import numpy as np
 import meshio
 import tkinter as tk
 from tkinter import filedialog, simpledialog
+from collections import Counter, defaultdict
 
 from shapely.geometry import Polygon, Point
 from scipy.spatial import Delaunay
 
 from shape_library import prepare_mesh  # only need prepare_mesh for boundary extraction
+
+############### New stuff 
+def boundary_loops_from_tris(VERT, TRIV):
+    """
+    Return (outer_loop_idx, [hole_loop_idx_1, hole_loop_idx_2, ...]),
+    where each is a 1D np.array of vertex indices ordered around the loop.
+    """
+    # Collect all triangle edges (unordered)
+    e01 = TRIV[:, [0, 1]]
+    e12 = TRIV[:, [1, 2]]
+    e20 = TRIV[:, [2, 0]]
+    edges = np.vstack([e01, e12, e20])
+    edges = np.sort(edges, axis=1)  # (i,j) with i<j
+
+    # Boundary edges appear exactly once
+    counts = Counter(map(tuple, edges))
+    bedges = [e for e, c in counts.items() if c == 1]
+    if not bedges:
+        raise RuntimeError("No boundary edges found; is the mesh closed?")
+
+    # Build adjacency on the boundary graph
+    nbrs = defaultdict(list)
+    for i, j in bedges:
+        nbrs[i].append(j)
+        nbrs[j].append(i)
+
+    # Sanity: manifold boundary -> degree 2 at boundary verts
+    # (We won't hard-fail; we'll still try to walk.)
+
+    # Walk each loop
+    loops = []
+    visited = set()
+    for start in list(nbrs.keys()):
+        if start in visited:
+            continue
+        loop = [start]
+        prev = None
+        cur = start
+        while True:
+            neigh = nbrs[cur]
+            # Pick the next neighbor that's not the previous
+            nxt = neigh[0] if len(neigh) == 1 or neigh[0] != prev else neigh[1]
+            if nxt == start:
+                break
+            loop.append(nxt)
+            prev, cur = cur, nxt
+            if cur in visited:  # guard against non-manifold weirdness
+                break
+        visited.update(loop)
+        loops.append(np.array(loop, dtype=int))
+
+    if not loops:
+        raise RuntimeError("Failed to assemble boundary loops.")
+
+    # Choose outer loop as the one with largest |area| (shoelace)
+    def signed_area(idx):
+        P = VERT[idx]
+        x, y = P[:, 0], P[:, 1]
+        return 0.5 * np.sum(x * np.roll(y, -1) - y * np.roll(x, -1))
+
+    loops_sorted = sorted(loops, key=lambda L: abs(signed_area(L)), reverse=True)
+    outer = loops_sorted[0]
+    holes = loops_sorted[1:]
+    return outer, holes
+
+#################
 
 def pick_file():
     root = tk.Tk()
@@ -96,22 +163,26 @@ def resample_scipy(VERT, TRIV, npts):
     Mimics shape_library.resample but uses SciPy Delaunay
     to avoid VisPy’s edge-splitting bug. Returns (V1, T1).
     """
-    # 1) extract the boundary loop
-    #    prepare_mesh returns 17 items; the last is ord_list
-    *_, ord_list = prepare_mesh(VERT, TRIV)
-    boundary_idx = ord_list[:, 0]
-    bd_pts = VERT[boundary_idx, :2]  # (B,2)
+    # 1) extract ALL boundary loops (outer + holes)
+    outer_idx, hole_indices = boundary_loops_from_tris(VERT, TRIV)
+    loop_pts = [VERT[outer_idx, :2]] + [VERT[h, :2] for h in hole_indices]
+    outer_pts = loop_pts[0]
+    hole_pts  = loop_pts[1:]
 
-    # subdivide each boundary edge into ~0.05 chunks
-    bound_pts = []
-    for i in range(len(boundary_idx)):
-        a = bd_pts[i]
-        b = bd_pts[(i+1) % len(boundary_idx)]
-        dist = np.linalg.norm(b - a)
-        steps = max(1, int(dist / 0.05))
-        for j in range(steps):
-            bound_pts.append(a + (b - a) * (j / steps))
-    bound_pts = np.array(bound_pts)
+    def subdivide_ring(ring_pts, target_step=0.05):
+        pts = []
+        n = len(ring_pts)
+        for i in range(n):
+            a = ring_pts[i]
+            b = ring_pts[(i + 1) % n]
+            dist = np.linalg.norm(b - a)
+            steps = max(1, int(dist / target_step))
+            for j in range(steps):
+                t = j / steps
+                pts.append(a + t * (b - a))
+        return np.array(pts)
+
+    bound_pts = np.vstack([subdivide_ring(r) for r in loop_pts])
 
     # 2) jittered grid interior candidates
     minx, maxx = VERT[:,0].min(), VERT[:,0].max()
@@ -124,7 +195,7 @@ def resample_scipy(VERT, TRIV, npts):
     grid += noise
 
     # 3) keep only those inside the polygon
-    poly = Polygon(bd_pts)
+    poly = Polygon(outer_pts, holes=[hp.tolist() for hp in hole_pts])  # holes OK
     inside_mask = np.array([poly.contains(Point(p)) for p in grid])
     interior_pts = grid[inside_mask]
 

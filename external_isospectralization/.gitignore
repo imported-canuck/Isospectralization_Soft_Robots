@@ -1,3 +1,8 @@
 **/*.pyc
 **/*.ipynb
 **/results
+pt-gpu/
+tf-cpu/
+.venv/
+env/
+venv/

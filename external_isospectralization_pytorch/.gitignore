@@ -103,6 +103,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+pt-gpu/
 .env
 .venv
 env/
