@@ -1,0 +1,12 @@
+﻿Package    Version
+---------- -------
+matplotlib 3.3.4
+open3d     0.15.1
+pip        21.3.1
+plyfile    0.7
+Rtree      0.9.7
+scipy      1.2.1
+Shapely    1.7.1
+tensorflow 1.13.1
+trimesh    3.23.5
+vispy      0.5.3
