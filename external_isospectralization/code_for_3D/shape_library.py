@@ -67,6 +67,56 @@ def load_mesh(path):
     
     return VERT, TRIV
 
+def load_ply(fname): # By Cagri A
+    """
+    Load a triangle mesh from a .ply file.
+    Returns:
+        VERT: (n,3) float64
+        TRIV: (m,3) int32, 0-based
+    Notes:
+        - Requires that the PLY has a 'vertex' element with x,y,z
+        - Requires faces ('face' element). If faces are polygons (n>3),
+          we triangulate with a fan.
+    """
+    ply = PlyData.read(fname)
+
+    # --- vertices ---
+    if 'vertex' not in ply:
+        raise ValueError("PLY has no 'vertex' element.")
+
+    v = ply['vertex']
+    # Standard PLY vertex properties (x,y,z)
+    VERT = np.vstack([v['x'], v['y'], v['z']]).T.astype(np.float64)
+
+    # --- faces ---
+    if 'face' not in ply:
+        raise ValueError("PLY has no 'face' element (no connectivity). Need triangles/faces.")
+
+    faces_raw = ply['face'].data
+    faces = []
+
+    for row in faces_raw:
+        # Most ply writers store face indices under 'vertex_indices'
+        # plyfile exposes it as row[0] if it's the first field.
+        idx = row[0]
+        idx = np.asarray(idx, dtype=np.int64)
+
+        if idx.size < 3:
+            continue
+        elif idx.size == 3:
+            faces.append(idx)
+        else:
+            # triangulate polygon as fan: (0, i, i+1)
+            for i in range(1, idx.size - 1):
+                faces.append([idx[0], idx[i], idx[i + 1]])
+
+    TRIV = np.asarray(faces, dtype=np.int32)
+
+    if TRIV.size == 0:
+        raise ValueError("PLY face list was empty or invalid after parsing.")
+
+    return VERT, TRIV
+
 def totuple(a):
     return [ tuple(i) for i in a]
     
