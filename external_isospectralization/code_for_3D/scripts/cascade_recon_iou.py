@@ -756,14 +756,14 @@ if __name__ == "__main__":
 RUN AS:
 .\external_isospectralization\tf-cpu\Scripts\python.exe `
   .\external_isospectralization\code_for_3D\scripts\cascade_recon_iou.py `
-  --start 6 --end 40 ` (first: mesh00006, last mesh00040)
-  --nevals_list "5,20,50" `
-  --numsteps 300 --checkpoint 10 --prefer_iter 299 ` 
-  --sphere_dir "data/Drake_Sphere" ` (first initial shape: sphere)
-  --bubble_root "data/Bubble_Grasp_Deep_0.05x40" ` (directory of mesh00006 to mesh00040 subdirs)
+  --start 6 --end 40 `
+  --nevals_list "5,20,50,75" `
+  --numsteps 300 --checkpoint 10 --prefer_iter 299 `
+  --sphere_dir "data/Drake_Sphere" `
+  --bubble_root "data/Bubble_Grasp_Deep_0.05x40" `
   --results_root "results/Cascade_Recon" `
   --out_dir "out/cascade" `
   --n_points 100000 --iou_pitch_mult 2.0 --padding 0.02 `
-  --overlay_gt_baseline ` (T/F for keeping GT baseline or not)
+  --overlay_gt_baseline `
   --resume --cache_target_evals
 '''

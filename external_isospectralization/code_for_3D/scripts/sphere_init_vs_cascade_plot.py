@@ -20,7 +20,7 @@ if str(CODE_ROOT) not in sys.path:
 # scripts in this repo assume cwd == code_for_3D
 os.chdir(str(CODE_ROOT))
 
-from shape_library import load_mesh, load_ply, prepare_mesh  # noqa
+from shape_library import load_mesh, prepare_mesh  # noqa
 from spectrum_alignment import OptimizationParams, calc_evals, run_optimization  # noqa
 
 import open3d as o3d  # noqa
@@ -74,16 +74,6 @@ def load_csv_rows(csv_path):
         return []
     with csv_path.open("r", newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
-
-
-def write_csv_rows(csv_path, fieldnames, rows):
-    csv_path = Path(csv_path)
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
-    with csv_path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        for r in rows:
-            w.writerow(r)
 
 
 def append_csv_row(csv_path, row, write_header_if_new=True):
@@ -252,11 +242,12 @@ def eval_iou_pre_post_icp(target_obj, recon_ply, pitch, padding, max_voxels, n_p
 
 
 # -----------------------------
-# experiment: sphere init for each target (nevals=20)
+# experiment: sphere init for each target (nevals = args.nevals)
 # -----------------------------
 def run_sphere_init_experiment(args, bubble_root, sphere_dir, results_root, out_dir):
-    nevals = 20  # forced
-    csv_path = out_dir / "sphere_init_ne20.csv"
+    nevals = int(args.nevals)
+    csv_path = out_dir / "sphere_init_nevals{}.csv".format(nevals)
+
     eval_cache_dir = out_dir / "evals_cache"
     if args.cache_target_evals:
         eval_cache_dir.mkdir(parents=True, exist_ok=True)
@@ -280,7 +271,7 @@ def run_sphere_init_experiment(args, bubble_root, sphere_dir, results_root, out_
 
         target_obj = _find_obj_in_dir(target_dir, preferred_name="{}.obj".format(name))
 
-        step_out = results_root / "sphere_init_ne20" / name
+        step_out = results_root / "sphere_init_nevals{}".format(nevals) / name
         step_out.mkdir(parents=True, exist_ok=True)
 
         # resume if row already exists AND recon ply exists
@@ -288,7 +279,6 @@ def run_sphere_init_experiment(args, bubble_root, sphere_dir, results_root, out_
             rows = load_csv_rows(csv_path)
             already = [r for r in rows if (r.get("mesh_idx") == str(idx))]
             if already:
-                # ensure recon exists
                 maybe_ply = already[-1].get("recon_ply", "")
                 if maybe_ply and Path(maybe_ply).exists():
                     print("[{}] sphere-init resume: already in CSV, skipping.".format(name))
@@ -311,14 +301,14 @@ def run_sphere_init_experiment(args, bubble_root, sphere_dir, results_root, out_
         if args.resume and recon_ply_expected.exists():
             print("[{}] recon exists, skipping optimization.".format(name))
         else:
-            print("[{}] sphere-init recon: running optimization...".format(name))
+            print("[{}] sphere-init recon: running optimization (nevals={})...".format(name, nevals))
             t0 = time.time()
             run_optimization(mesh=mesh0, target_evals=evals_t, out_path=str(step_out), params=params)
             print("[{}] sphere-init recon: done in {:.1f}s".format(name, time.time() - t0))
 
         recon_ply, used_iter = find_recon_ply(step_out, nevals, prefer_iter=int(args.prefer_iter))
 
-        # choose pitch based on target size (same approach as cascade)
+        # choose pitch based on target size
         tgt_mesh_o3d = o3d.io.read_triangle_mesh(str(target_obj))
         tgt_pcd = mesh_to_pcd(tgt_mesh_o3d, n_points=int(args.n_points))
         base_voxel = estimate_base_voxel_from_sampling(tgt_pcd)
@@ -363,9 +353,9 @@ def run_sphere_init_experiment(args, bubble_root, sphere_dir, results_root, out_
 
 
 # -----------------------------
-# plot: cascade(ne20) vs sphere-init(ne20)
+# plot: cascade(nevals) vs sphere-init(nevals)
 # -----------------------------
-def plot_overlay(cascade_csv_path, sphereinit_csv_path, out_dir):
+def plot_overlay(cascade_csv_path, sphereinit_csv_path, out_dir, nevals):
     import matplotlib.pyplot as plt
 
     cascade_rows = load_csv_rows(cascade_csv_path)
@@ -380,7 +370,7 @@ def plot_overlay(cascade_csv_path, sphereinit_csv_path, out_dir):
                 ne = int(float(r.get("nevals", "0")))
             except Exception:
                 ne = 0
-            if ne != 20:
+            if ne != int(nevals):
                 continue
             try:
                 xs.append(int(r["mesh_idx"]))
@@ -388,7 +378,6 @@ def plot_overlay(cascade_csv_path, sphereinit_csv_path, out_dir):
                 post.append(float(r["iou_aligned"]))
             except Exception:
                 pass
-        # sort
         order = np.argsort(np.array(xs))
         xs = np.array(xs)[order]
         pre = np.array(pre)[order]
@@ -399,19 +388,21 @@ def plot_overlay(cascade_csv_path, sphereinit_csv_path, out_dir):
     sx, spre, spost = extract_xy(sph_rows)
 
     if len(cx) == 0:
-        raise RuntimeError("No nevals=20 rows found in cascade CSV: {}".format(cascade_csv_path))
+        raise RuntimeError("No nevals={} rows found in cascade CSV: {}".format(nevals, cascade_csv_path))
     if len(sx) == 0:
-        raise RuntimeError("No nevals=20 rows found in sphere-init CSV: {}".format(sphereinit_csv_path))
+        raise RuntimeError("No nevals={} rows found in sphere-init CSV: {}".format(nevals, sphereinit_csv_path))
 
     plt.figure(figsize=(10.5, 5.8))
 
     # Cascade: same color pre/post, circular markers
-    l1, = plt.plot(cx, cpre, "--o", linewidth=2, markersize=4, label="Cascade (ne=20) IoU pre-ICP")
-    plt.plot(cx, cpost, "-o", linewidth=2.5, markersize=4, color=l1.get_color(), label="Cascade (ne=20) IoU post-ICP")
+    l1, = plt.plot(cx, cpre, "--o", linewidth=2, markersize=4, label="Cascade (ne={}) IoU pre-ICP".format(nevals))
+    plt.plot(cx, cpost, "-o", linewidth=2.5, markersize=4, color=l1.get_color(),
+             label="Cascade (ne={}) IoU post-ICP".format(nevals))
 
     # Sphere-init: different color, circular markers
-    l2, = plt.plot(sx, spre, "--o", linewidth=2, markersize=4, label="Sphere-init (ne=20) IoU pre-ICP")
-    plt.plot(sx, spost, "-o", linewidth=2.5, markersize=4, color=l2.get_color(), label="Sphere-init (ne=20) IoU post-ICP")
+    l2, = plt.plot(sx, spre, "--o", linewidth=2, markersize=4, label="Sphere-init (ne={}) IoU pre-ICP".format(nevals))
+    plt.plot(sx, spost, "-o", linewidth=2.5, markersize=4, color=l2.get_color(),
+             label="Sphere-init (ne={}) IoU post-ICP".format(nevals))
 
     xmin = int(min(cx.min(), sx.min()))
     xmax = int(max(cx.max(), sx.max()))
@@ -420,12 +411,12 @@ def plot_overlay(cascade_csv_path, sphereinit_csv_path, out_dir):
     plt.grid(True, alpha=0.25)
     plt.xlabel("Mesh index")
     plt.ylabel("Voxel IoU")
-    plt.title("Cascade vs Sphere-init reconstruction (ne=20)")
+    plt.title("Cascade vs Sphere-init reconstruction (ne={})".format(nevals))
     plt.legend()
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = out_dir / "cascade_iou_plot_combined.png"
+    plot_path = out_dir / "cascade_vs_sphereinit_nevals{}_plot.png".format(nevals)
     plt.tight_layout()
     plt.savefig(str(plot_path), dpi=220)
     plt.close()
@@ -436,6 +427,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--start", type=int, default=6)
     ap.add_argument("--end", type=int, default=40)
+
+    ap.add_argument("--nevals", type=int, required=True, help="Number of eigenvalues for both experiments (e.g. 20)")
 
     ap.add_argument("--sphere_dir", type=str, default="data/Drake_Sphere")
     ap.add_argument("--bubble_root", type=str, default="data/Bubble_Grasp_Deep_0.05x40")
@@ -455,11 +448,12 @@ def main():
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--cache_target_evals", action="store_true")
 
+    # new default: cascade_iou_nevals{N}.csv (instead of cascade_iou.csv)
     ap.add_argument(
         "--cascade_csv",
         type=str,
-        default="out/cascade/cascade_iou.csv",
-        help="Path to your existing cascade CSV (will be read only).",
+        default=None,
+        help="Optional override. If omitted, uses out_dir/cascade_iou_nevals{nevals}.csv",
     )
 
     args = ap.parse_args()
@@ -469,34 +463,40 @@ def main():
     results_root = Path(args.results_root).resolve()
     out_dir = Path(args.out_dir).resolve()
 
-    cascade_csv = Path(args.cascade_csv).resolve()
+    nevals = int(args.nevals)
+
+    if args.cascade_csv is None:
+        cascade_csv = (out_dir / "cascade_iou_nevals{}.csv".format(nevals)).resolve()
+    else:
+        cascade_csv = Path(args.cascade_csv).resolve()
+
     if not cascade_csv.exists():
         raise FileNotFoundError("Cascade CSV not found: {}".format(cascade_csv))
 
     print("Working directory:", Path.cwd())
+    print("nevals:", nevals)
     print("Cascade CSV:", cascade_csv)
-    print("Sphere init experiment CSV will be written to out_dir.")
+    print("Sphere-init experiment CSV will be written to out_dir.")
     print()
 
     sphere_csv = run_sphere_init_experiment(args, bubble_root, sphere_dir, results_root, out_dir)
-    plot_overlay(cascade_csv, sphere_csv, out_dir)
+    plot_overlay(cascade_csv, sphere_csv, out_dir, nevals=nevals)
 
 
 if __name__ == "__main__":
     main()
 
 '''
-RUN AS (compares 20eval cascade to always rcons from sphere):
+RUN AS (FROM ROOT)
 .\external_isospectralization\tf-cpu\Scripts\python.exe `
   .\external_isospectralization\code_for_3D\scripts\sphere_init_vs_cascade_plot.py `
   --start 6 --end 40 `
+  --nevals 75 `
   --sphere_dir "data/Drake_Sphere" `
   --bubble_root "data/Bubble_Grasp_Deep_0.05x40" `
   --results_root "results/Cascade_Recon" `
   --out_dir "out/cascade" `
-  --cascade_csv "out/cascade/cascade_iou.csv" `
   --numsteps 300 --checkpoint 10 --prefer_iter 299 `
   --n_points 100000 --iou_pitch_mult 2.0 --padding 0.02 `
   --resume --cache_target_evals
-
 '''
