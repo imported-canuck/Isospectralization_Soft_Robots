@@ -25,6 +25,9 @@ class OptimizationParams:
         
         self.volume_reg = 1e1 # Try 1e3?
         self.l2_reg = 2e6
+        # One-sided regularizer that penalizes only outward motion along
+        # the source-mesh normals, allowing inward dents/collapse.
+        self.outward_reg = 5e5
         
         self.opt_step = 0.00025
         self.min_eval_loss = 0.05
@@ -137,9 +140,25 @@ def build_graph(mesh, evals, nevals,nfix, step=1.0, params=OptimizationParams())
         cosine_decay = 0.5 * (1 + tf.cos(3.14 * tf.minimum(np.asarray(params.numsteps/2.0,dtype=dtype),graph.global_step) / (params.numsteps/2.0)))
         graph.decay= (1 - params.decay_target) * cosine_decay + params.decay_target
         
+        graph.outward_hinge = tf.constant(0.0, dtype=dtype)
         if(params.smoothing=='displacement'):    
             graph.vcL = params.curvature_reg*graph.decay * tf.nn.l2_loss( tf.matmul(Bary.astype(dtype),dX)[nfix:,:]);
-            graph.vcW = params.smoothness_reg*graph.decay *tf.nn.l2_loss( tf.matmul(Lx,dX)[nfix:,:]) 
+            graph.vcW = params.smoothness_reg*graph.decay *tf.nn.l2_loss( tf.matmul(Lx,dX)[nfix:,:])
+
+            # Outward-motion hinge regularizer (displacement mode only):
+            # penalize positive displacement along rest-state normals, while
+            # leaving inward displacements mostly unconstrained.
+            v1 = Xori[TRIV[:, 1], :] - Xori[TRIV[:, 0], :]
+            v2 = Xori[TRIV[:, 2], :] - Xori[TRIV[:, 0], :]
+            tri_normals = np.cross(v1, v2)
+            vertex_normals = np.zeros_like(Xori)
+            np.add.at(vertex_normals, TRIV[:, 0], tri_normals)
+            np.add.at(vertex_normals, TRIV[:, 1], tri_normals)
+            np.add.at(vertex_normals, TRIV[:, 2], tri_normals)
+            vertex_normals /= (np.linalg.norm(vertex_normals, axis=1, keepdims=True) + 1e-12)
+
+            normal_disp = tf.reduce_sum(dX * vertex_normals.astype(dtype), axis=1, keepdims=True)
+            graph.outward_hinge = params.outward_reg * graph.decay * tf.nn.l2_loss(S * tf.nn.relu(normal_disp)[nfix:, :])
         if(params.smoothing=='absolute'):
             graph.vcL = params.curvature_reg*graph.decay * tf.nn.l2_loss( tf.matmul(Bary.astype(dtype),S*graph.X)[nfix:,:]);
             graph.vcW = params.smoothness_reg**graph.decay *tf.nn.l2_loss( tf.matmul(Lx,graph.X)[nfix:,:]) 
@@ -152,12 +171,11 @@ def build_graph(mesh, evals, nevals,nfix, step=1.0, params=OptimizationParams())
         T_C = (T1+T2+T3)/3
         graph.Volume = params.volume_reg*graph.decay*tf.reduce_sum(XP*T_C/2)/3
 
-
         #L2 regularizer on total displacement weighted by area elements
         graph.l2_reg = params.l2_reg*tf.nn.l2_loss(S*dX)
 
             
-        graph.cost_spectral = graph.cost_evals_f1 + graph.vcW + graph.vcL -  graph.Volume + graph.l2_reg
+        graph.cost_spectral = graph.cost_evals_f1 + graph.vcW + graph.vcL -  graph.Volume + graph.l2_reg + graph.outward_hinge
 
         optimizer = tf.train.AdamOptimizer(params.opt_step)
         
@@ -209,8 +227,8 @@ def run_optimization(mesh, target_evals, out_path, params = OptimizationParams()
                     if ( (step) % params.checkpoint == 0 or step==(params.numsteps-1) ):  
                         toc()
                         tic()
-                        er, erE, ervcL, Xopt2, evout, errcW, vol, l2reg = session.run([graph.cost_spectral, graph.cost_evals_f1, graph.vcL, graph.X, graph.s_, graph.vcW, graph.Volume, graph.l2_reg])
-                        print('Iter %f, cost: %f(e %f, l %f, w %f - vol: %f + l2reg: %f)' % (step, er, erE,  ervcL, errcW, vol, l2reg))
+                        er, erE, ervcL, Xopt2, evout, errcW, vol, l2reg, ohinge = session.run([graph.cost_spectral, graph.cost_evals_f1, graph.vcL, graph.X, graph.s_, graph.vcW, graph.Volume, graph.l2_reg, graph.outward_hinge])
+                        print('Iter %f, cost: %f(e %f, l %f, w %f - vol: %f + l2reg: %f + out: %f)' % (step, er, erE,  ervcL, errcW, vol, l2reg, ohinge))
 
                         save_ply(Xopt,TRIV,'%s/evals_%d_iter%d.ply' % (out_path,nevals,step))
                         np.savetxt('%s/evals_%d_iter%d.txt' % (out_path,nevals,step),evout)
