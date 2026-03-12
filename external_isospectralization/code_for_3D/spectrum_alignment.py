@@ -10,7 +10,7 @@ from shape_library import *
     
 class OptimizationParams:
     def __init__(self, smoothing='displacement'):
-        self.checkpoint = 100
+        self.checkpoint = 50
         self.numsteps = 2000
         self.evals = [10,20,30]
         self.smoothing = smoothing
@@ -18,16 +18,16 @@ class OptimizationParams:
         
         if(smoothing=='displacement'):
             self.curvature_reg = 2e3
-            self.smoothness_reg = 2e3
+            self.smoothness_reg = 4e5
         else:
             self.curvature_reg = 1e5
             self.smoothness_reg = 5e4
         
-        self.volume_reg = 1e1 # Try 1e3?
+        self.volume_reg = 0 # Try 1e3?
         self.l2_reg = 2e6
         # One-sided regularizer that penalizes only outward motion along
         # the source-mesh normals, allowing inward dents/collapse.
-        self.outward_reg = 5e5
+        self.outward_reg = 5e10
         
         self.opt_step = 0.00025
         self.min_eval_loss = 0.05

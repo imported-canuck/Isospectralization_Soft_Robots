@@ -1,0 +1,20 @@
+
+\documentclass{article}
+\newcommand{\mathdefault}[1]{#1}
+\usepackage{type1cm}
+\usepackage{type1ec}
+\usepackage{type1ec}
+\usepackage{type1ec}
+\usepackage[utf8]{inputenc}
+\DeclareUnicodeCharacter{2212}{\ensuremath{-}}
+\usepackage[papersize=72in,body=70in,margin=1in]{geometry}
+\usepackage{amsmath} \usepackage{amssymb}
+\makeatletter\@ifpackageloaded{textcomp}{}{\usepackage{textcomp}}\makeatother
+\pagestyle{empty}
+\begin{document}
+% The empty hbox ensures that a page is printed even for empty inputs, except
+% when using psfrag which gets confused by it.
+\fontsize{8.000000}{10.000000}%
+\ifdefined\psfrag\else\hbox{}\fi%
+{\rmfamily Cascade (ne=50) IoU post-ICP}
+\end{document}
