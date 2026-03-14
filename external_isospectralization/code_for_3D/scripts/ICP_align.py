@@ -1,3 +1,18 @@
+# icp_iou_combo.py
+#
+# Adds visualization knobs:
+#   --vis_pre   : show pre-alignment (moving vs stable)
+#   --vis_post  : show post-alignment (moving transformed vs stable)
+#
+# Prints ONLY:
+#   - Naive IoU (before)
+#   - IoU (after ICP)
+#   - RMSE
+#   - Rotation matrix R
+#
+# Dependencies:
+#   pip install open3d trimesh rtree
+
 import argparse
 import numpy as np
 import open3d as o3d
@@ -250,7 +265,7 @@ def main():
             title="Post-alignment (target=blue, source-aligned=orange)"
         )
 
-    # Print data 
+    # Print ONLY what you asked for
     print("Naive IoU (before):", iou_naive)
     print("IoU (after ICP):", iou_aligned)
     print("RMSE:", rmse)

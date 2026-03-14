@@ -490,8 +490,8 @@ if __name__ == "__main__":
 RUN AS (FROM ROOT)
 .\external_isospectralization\tf-cpu\Scripts\python.exe `
   .\external_isospectralization\code_for_3D\scripts\sphere_init_vs_cascade_plot.py `
-  --start 6 --end 40 `
-  --nevals 75 `
+  --start 6 --end 28 `
+  --nevals 50 `
   --sphere_dir "data/Drake_Sphere" `
   --bubble_root "data/Bubble_Grasp_Deep_0.05x40" `
   --results_root "results/Cascade_Recon" `

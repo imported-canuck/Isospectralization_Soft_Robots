@@ -503,7 +503,7 @@ def main():
         params.evals = [int(nevals)]  # CHANGED
         params.numsteps = int(args.numsteps)
         params.checkpoint = int(args.checkpoint)
-        params.volume_reg = 1e1
+        params.volume_reg = 0
 
         # Initial shape for this nevals run = Drake sphere dir
         current_initial_kind = "dir"
@@ -756,7 +756,7 @@ if __name__ == "__main__":
 RUN AS:
 .\external_isospectralization\tf-cpu\Scripts\python.exe `
   .\external_isospectralization\code_for_3D\scripts\cascade_recon_iou.py `
-  --start 6 --end 40 `
+  --start 6 --end 28 `
   --nevals_list "5,20,50,75" `
   --numsteps 300 --checkpoint 10 --prefer_iter 299 `
   --sphere_dir "data/Drake_Sphere" `
